@@ -1182,26 +1182,25 @@ async function procesarFotoFecha(event){
     const detectada = document.getElementById("fechaDetectada");
 
     box.classList.remove("oculto");
-    estado.textContent = "Leyendo la fecha...";
+    estado.textContent = "Preparando la imagen...";
     detectada.textContent = "";
 
     try{
 
-        const resultado = await Tesseract.recognize(
-            archivo,
-            "spa",
-            {
-                logger: function(m){
+        const imagenProcesada = await prepararImagenFecha(archivo);
 
-                    if(m.status === "recognizing text" && typeof m.progress === "number"){
-                        estado.textContent =
-                            "Leyendo la fecha... " +
-                            Math.round(m.progress * 100) +
-                            "%";
-                    }
-                }
-            }
-        );
+        estado.textContent = "Leyendo la fecha...";
+
+        const worker = await Tesseract.createWorker("spa");
+
+        await worker.setParameters({
+            tessedit_char_whitelist: "0123456789/.-",
+            preserve_interword_spaces: "1"
+        });
+
+        const resultado = await worker.recognize(imagenProcesada);
+
+        await worker.terminate();
 
         const texto = resultado.data.text || "";
 
@@ -1210,7 +1209,7 @@ async function procesarFotoFecha(event){
         if(fechas.length === 0){
 
             estado.textContent =
-                "No he podido detectar una fecha con seguridad. Puedes escribirla manualmente.";
+                "No he podido detectar una fecha con seguridad. Puedes repetir la foto acercándote más o escribirla manualmente.";
 
             return;
         }
@@ -1286,6 +1285,91 @@ async function procesarFotoFecha(event){
     }
 }
 
+
+function prepararImagenFecha(archivo){
+
+    return new Promise(function(resolve, reject){
+
+        const lector = new FileReader();
+
+        lector.onload = function(){
+
+            const img = new Image();
+
+            img.onload = function(){
+
+                try{
+
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+
+                    const recorteX = Math.floor(img.width * 0.12);
+                    const recorteY = Math.floor(img.height * 0.28);
+                    const recorteW = Math.floor(img.width * 0.76);
+                    const recorteH = Math.floor(img.height * 0.44);
+
+                    const anchoSalida = 1400;
+                    const escala = anchoSalida / recorteW;
+                    const altoSalida = Math.round(recorteH * escala);
+
+                    canvas.width = anchoSalida;
+                    canvas.height = altoSalida;
+
+                    ctx.drawImage(
+                        img,
+                        recorteX,
+                        recorteY,
+                        recorteW,
+                        recorteH,
+                        0,
+                        0,
+                        anchoSalida,
+                        altoSalida
+                    );
+
+                    const datos = ctx.getImageData(
+                        0,
+                        0,
+                        canvas.width,
+                        canvas.height
+                    );
+
+                    const px = datos.data;
+
+                    for(let i = 0; i < px.length; i += 4){
+
+                        const gris =
+                            Math.round(
+                                0.299 * px[i] +
+                                0.587 * px[i + 1] +
+                                0.114 * px[i + 2]
+                            );
+
+                        const contraste =
+                            gris < 155 ? 0 : 255;
+
+                        px[i] = contraste;
+                        px[i + 1] = contraste;
+                        px[i + 2] = contraste;
+                    }
+
+                    ctx.putImageData(datos, 0, 0);
+
+                    resolve(canvas.toDataURL("image/png"));
+
+                }catch(error){
+                    reject(error);
+                }
+            };
+
+            img.onerror = reject;
+            img.src = lector.result;
+        };
+
+        lector.onerror = reject;
+        lector.readAsDataURL(archivo);
+    });
+}
 
 function extraerFechas(texto){
 

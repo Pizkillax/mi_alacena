@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Mi Alacena</title>
+
+    <style>
+        *{box-sizing:border-box}
+
+        body{
+            margin:0;
+            font-family:Arial,sans-serif;
+            background:#f6f4ef;
+            color:#333
+        }
+
+        .app{
+            max-width:600px;
+            margin:auto;
+            padding:20px
+        }
+
+        h1{margin-bottom:5px}
+
+        .sub{
+            color:#666;
+            margin-top:0;
+            margin-bottom:25px
+        }
+
+        .entrada{
+            display:flex;
+            gap:10px;
+            margin-bottom:25px
+        }
+
+        input,select{
+            width:100%;
+            padding:14px;
+            border:1px solid #ccc;
+            border-radius:10px;
+            font-size:16px;
+            background:white
+        }
+
+        button{
+            border:0;
+            border-radius:10px;
+            padding:14px 18px;
+            font-size:16px;
+            background:#477a57;
+            color:white;
+            cursor:pointer
+        }
+
+        .loc,.prod{
+            background:white;
+            padding:18px;
+            margin-bottom:12px;
+            border-radius:12px;
+            box-shadow:0 2px 6px #0001
+        }
+
+        .loc{
+            font-size:18px;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px
+        }
+
+        .loc-nombre{
+            flex:1
+        }
+
+        .borrar-loc{
+            background:#a94d4d;
+            padding:8px 10px;
+            font-size:14px
+        }
+
+        .vacio{
+            text-align:center;
+            color:#888;
+            margin-top:40px
+        }
+
+        .oculto{display:none}
+
+        .grande{
+            width:100%;
+            margin:12px 0
+        }
+
+        .volver{
+            background:transparent;
+            color:#477a57;
+            padding:8px 0;
+            font-weight:bold
+        }
+
+        .campo{
+            margin-bottom:16px
+        }
+
+        .campo label{
+            display:block;
+            font-weight:bold;
+            margin-bottom:7px
+        }
+
+        .prod{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px
+        }
+
+        .prod-info{
+            flex:1
+        }
+
+        .prod b{
+            font-size:17px
+        }
+
+        .prod .cantidad-texto{
+            color:#666;
+            margin-top:5px
+        }
+
+        .controles{
+            display:flex;
+            align-items:center;
+            gap:8px
+        }
+
+        .control{
+            width:38px;
+            height:38px;
+            padding:0;
+            font-size:22px;
+            line-height:38px;
+            text-align:center
+        }
+
+        .numero{
+            min-width:26px;
+            text-align:center;
+            font-weight:bold;
+            font-size:18px
+        }
+
+        .producto-cabecera{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            width:100%;
+        }
+
+        .detalle-fechas{
+            margin-top:12px;
+            padding-top:10px;
+            border-top:1px solid #ddd;
+            width:100%;
+        }
+
+        .fila-fecha{
+            display:flex;
+            justify-content:space-between;
+            gap:12px;
+            padding:6px 0;
+            color:#555;
+            font-size:14px;
+        }
+
+        .prod.expandible{
+            display:block;
+            cursor:pointer;
+        }
+
+        .indicador-fechas{
+            color:#477a57;
+            font-size:14px;
+            margin-top:5px;
+        }
+
+        .scanner-box{
+            margin:14px 0 18px;
+            padding:12px;
+            background:white;
+            border-radius:12px;
+            box-shadow:0 2px 6px #0001;
+        }
+
+        #reader{
+            width:100%;
+        }
+
+        .estado-scan{
+            margin-top:10px;
+            color:#666;
+            font-size:14px;
+        }
+
+        .codigo-detectado{
+            margin-top:8px;
+            font-size:14px;
+            color:#477a57;
+            font-weight:bold;
+        }
+
+        .secundario{
+            background:#6d6d6d;
+        }
+    </style>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+
+<body>
+<div class="app">
+
+    <section id="principal">
+        <h1 id="titulo">Vamos a organizar tu alacena</h1>
+
+        <p class="sub" id="sub">
+            Empieza creando las localizaciones donde guardas los alimentos.
+        </p>
+
+        <div class="entrada">
+            <input id="nombreLoc" placeholder="Ej. Armario grande">
+            <button onclick="anadirLoc()">Añadir</button>
+        </div>
+
+        <div id="listaLoc"></div>
+
+        <button id="btnProducto"
+                class="grande oculto"
+                onclick="abrirProducto()">
+            + Añadir producto
+        </button>
+    </section>
+
+
+    <section id="nuevoProducto" class="oculto">
+
+        <button class="volver" onclick="inicio()">← Volver</button>
+
+        <h1>Añadir producto</h1>
+
+        <p class="sub">
+            Introduce el producto y elige dónde lo vas a guardar.
+        </p>
+
+        <button class="grande" onclick="iniciarEscaner()">
+            Escanear código de barras
+        </button>
+
+        <div id="scannerBox" class="scanner-box oculto">
+            <div id="reader"></div>
+            <div id="estadoScan" class="estado-scan">
+                Apunta la cámara al código de barras.
+            </div>
+            <div id="codigoDetectado" class="codigo-detectado"></div>
+            <button class="grande secundario" onclick="cerrarEscaner()">
+                Cerrar cámara
+            </button>
+        </div>
+
+        <div class="campo">
+            <label>Producto</label>
+            <input id="nombreProd" placeholder="Ej. Tomate triturado">
+            <input id="codigoBarras" type="hidden">
+        </div>
+
+        <div class="campo">
+            <label>Cantidad</label>
+            <input id="cantidad" type="number" min="1" step="1" value="1">
+        </div>
+
+        <div class="campo">
+            <label>Fecha de caducidad</label>
+            <input id="caducidad" type="date">
+        </div>
+
+        <div class="campo">
+            <label>¿Dónde lo guardas?</label>
+            <select id="selectorLoc"></select>
+        </div>
+
+        <button class="grande" onclick="guardarProd()">
+            Guardar producto
+        </button>
+
+        <button class="grande"
+                onclick="document.getElementById('crearLocProd').classList.remove('oculto')">
+            + Nueva localización
+        </button>
+
+        <div id="crearLocProd" class="entrada oculto">
+            <input id="nuevaLoc" placeholder="Nueva localización">
+            <button onclick="crearLocDesdeProducto()">Crear</button>
+        </div>
+    </section>
+
+
+    <section id="verLoc" class="oculto">
+
+        <button class="volver" onclick="inicio()">← Volver</button>
+
+        <h1 id="tituloLoc"></h1>
+
+        <p class="sub">
+            Productos guardados aquí.
+        </p>
+
+        <div id="listaProd"></div>
+    </section>
+
+</div>
+
+
+<script>
+
+let localizaciones =
+    JSON.parse(localStorage.getItem("localizaciones")) || [];
+
+let productos =
+    JSON.parse(localStorage.getItem("productos")) || [];
+
+let localizacionAbierta = null;
+
+let html5QrCode = null;
+let escanerActivo = false;
+let procesandoCodigo = false;
+
+
+function saveLoc(){
+    localStorage.setItem(
+        "localizaciones",
+        JSON.stringify(localizaciones)
+    );
+}
+
+
+function saveProd(){
+    localStorage.setItem(
+        "productos",
+        JSON.stringify(productos)
+    );
+}
+
+
+function anadirLoc(){
+
+    let input = document.getElementById("nombreLoc");
+    let nombre = input.value.trim();
+
+    if(!nombre) return;
+
+    localizaciones.push(nombre);
+
+    saveLoc();
+
+    input.value = "";
+
+    mostrarLoc();
+}
+
+
+function mostrarLoc(){
+
+    let lista = document.getElementById("listaLoc");
+    let titulo = document.getElementById("titulo");
+    let sub = document.getElementById("sub");
+    let botonProducto = document.getElementById("btnProducto");
+
+    lista.innerHTML = "";
+
+    if(!localizaciones.length){
+
+        titulo.textContent = "Vamos a organizar tu alacena";
+
+        sub.textContent =
+            "Empieza creando las localizaciones donde guardas los alimentos.";
+
+        lista.innerHTML =
+            '<div class="vacio">Todavía no hay ninguna localización.</div>';
+
+        botonProducto.classList.add("oculto");
+
+        return;
+    }
+
+    titulo.textContent = "Mi Alacena";
+    sub.textContent = "Estas son tus localizaciones.";
+    botonProducto.classList.remove("oculto");
+
+    localizaciones.forEach(function(nombre){
+
+        let fila = document.createElement("div");
+        fila.className = "loc";
+
+        let texto = document.createElement("div");
+        texto.className = "loc-nombre";
+        texto.textContent = nombre;
+
+        texto.onclick = function(){
+            abrirLoc(nombre);
+        };
+
+        let borrar = document.createElement("button");
+        borrar.className = "borrar-loc";
+        borrar.textContent = "Borrar";
+
+        borrar.onclick = function(event){
+            event.stopPropagation();
+            borrarLocalizacion(nombre);
+        };
+
+        fila.appendChild(texto);
+        fila.appendChild(borrar);
+
+        lista.appendChild(fila);
+    });
+}
+
+
+function borrarLocalizacion(nombre){
+
+    const productosDentro =
+        productos.filter(function(producto){
+            return producto.localizacion === nombre;
+        });
+
+    if(productosDentro.length > 0){
+
+        const borrarTodo = confirm(
+            'La localización "' + nombre +
+            '" contiene ' + productosDentro.length +
+            ' producto(s).\n\n' +
+            'Aceptar: borrar la localización y todos sus productos.\n' +
+            'Cancelar: no borrar nada.'
+        );
+
+        if(!borrarTodo){
+            return;
+        }
+
+        productos =
+            productos.filter(function(producto){
+                return producto.localizacion !== nombre;
+            });
+
+        saveProd();
+
+    } else {
+
+        const confirmar = confirm(
+            '¿Quieres borrar la localización "' + nombre + '"?'
+        );
+
+        if(!confirmar){
+            return;
+        }
+    }
+
+    localizaciones =
+        localizaciones.filter(function(localizacion){
+            return localizacion !== nombre;
+        });
+
+    saveLoc();
+    mostrarLoc();
+}
+
+
+function pant(id){
+
+    ["principal","nuevoProducto","verLoc"].forEach(function(x){
+
+        document
+            .getElementById(x)
+            .classList.toggle("oculto", x !== id);
+    });
+}
+
+
+function inicio(){
+
+    cerrarEscaner();
+
+    pant("principal");
+
+    document
+        .getElementById("crearLocProd")
+        .classList.add("oculto");
+
+    localizacionAbierta = null;
+
+    mostrarLoc();
+}
+
+
+function selector(){
+
+    let select = document.getElementById("selectorLoc");
+
+    select.innerHTML = "";
+
+    localizaciones.forEach(function(nombre){
+
+        let opcion = document.createElement("option");
+
+        opcion.value = nombre;
+        opcion.textContent = nombre;
+
+        select.appendChild(opcion);
+    });
+}
+
+
+function abrirProducto(){
+
+    selector();
+    pant("nuevoProducto");
+
+    document.getElementById("codigoBarras").value = "";
+    document.getElementById("codigoDetectado").textContent = "";
+    document.getElementById("estadoScan").textContent =
+        "Apunta la cámara al código de barras.";
+}
+
+
+function guardarProd(){
+
+    let nombre =
+        document.getElementById("nombreProd").value.trim();
+
+    let cantidad =
+        parseInt(document.getElementById("cantidad").value, 10);
+
+    let caducidad =
+        document.getElementById("caducidad").value || "";
+
+    let localizacion =
+        document.getElementById("selectorLoc").value;
+
+    let codigo =
+        document.getElementById("codigoBarras").value || "";
+
+    if(!nombre || !cantidad || cantidad < 1 || !localizacion){
+        return;
+    }
+
+    let existente = productos.find(function(producto){
+        return producto.nombre.toLowerCase() === nombre.toLowerCase() &&
+               producto.localizacion === localizacion;
+    });
+
+    if(existente){
+
+        if(codigo && !existente.codigoBarras){
+            existente.codigoBarras = codigo;
+        }
+
+        if(!Array.isArray(existente.lotes)){
+            existente.lotes = [];
+
+            if(typeof existente.cantidad === "number"){
+                existente.lotes.push({
+                    cantidad: existente.cantidad,
+                    caducidad: ""
+                });
+            }
+
+            delete existente.cantidad;
+        }
+
+        let loteExistente = existente.lotes.find(function(lote){
+            return lote.caducidad === caducidad;
+        });
+
+        if(loteExistente){
+            loteExistente.cantidad += cantidad;
+        } else {
+            existente.lotes.push({
+                cantidad:cantidad,
+                caducidad:caducidad
+            });
+        }
+
+    } else {
+
+        productos.push({
+            nombre:nombre,
+            localizacion:localizacion,
+            codigoBarras:codigo,
+            lotes:[
+                {
+                    cantidad:cantidad,
+                    caducidad:caducidad
+                }
+            ]
+        });
+    }
+
+    saveProd();
+
+    document.getElementById("nombreProd").value = "";
+    document.getElementById("cantidad").value = 1;
+    document.getElementById("caducidad").value = "";
+    document.getElementById("codigoBarras").value = "";
+
+    cerrarEscaner();
+    inicio();
+}
+
+function crearLocDesdeProducto(){
+
+    let input = document.getElementById("nuevaLoc");
+    let nombre = input.value.trim();
+
+    if(!nombre) return;
+
+    localizaciones.push(nombre);
+
+    saveLoc();
+
+    input.value = "";
+
+    selector();
+
+    document.getElementById("selectorLoc").value = nombre;
+
+    document
+        .getElementById("crearLocProd")
+        .classList.add("oculto");
+}
+
+
+function abrirLoc(nombre){
+
+    localizacionAbierta = nombre;
+
+    pant("verLoc");
+
+    document.getElementById("tituloLoc").textContent = nombre;
+
+    mostrarProductosLocalizacion();
+}
+
+
+function mostrarProductosLocalizacion(){
+
+    let lista = document.getElementById("listaProd");
+
+    let encontrados =
+        productos
+            .map(function(producto, indice){
+                return {
+                    producto:producto,
+                    indice:indice
+                };
+            })
+            .filter(function(item){
+                return item.producto.localizacion === localizacionAbierta;
+            });
+
+    lista.innerHTML = "";
+
+    if(!encontrados.length){
+
+        lista.innerHTML =
+            '<div class="vacio">No hay productos en esta localización.</div>';
+
+        return;
+    }
+
+    encontrados.forEach(function(item){
+
+        let producto = item.producto;
+        let indice = item.indice;
+
+        if(!Array.isArray(producto.lotes)){
+            producto.lotes = [{
+                cantidad: typeof producto.cantidad === "number" ? producto.cantidad : 0,
+                caducidad:""
+            }];
+            delete producto.cantidad;
+            saveProd();
+        }
+
+        let cantidadTotal = producto.lotes.reduce(function(total,lote){
+            return total + lote.cantidad;
+        },0);
+
+        let fila = document.createElement("div");
+        fila.className = "prod";
+
+        let info = document.createElement("div");
+        info.className = "prod-info";
+
+        let nombre = document.createElement("b");
+        nombre.textContent = producto.nombre;
+
+        let cantidadTexto = document.createElement("div");
+        cantidadTexto.className = "cantidad-texto";
+        cantidadTexto.textContent = "Unidades: " + cantidadTotal;
+
+        info.appendChild(nombre);
+        info.appendChild(cantidadTexto);
+
+        if(producto.lotes.length === 1){
+
+            let cad = document.createElement("div");
+            cad.className = "indicador-fechas";
+            cad.textContent = producto.lotes[0].caducidad
+                ? "Caduca: " + formatearFecha(producto.lotes[0].caducidad)
+                : "Sin fecha de caducidad";
+
+            info.appendChild(cad);
+
+        } else {
+
+            fila.classList.add("expandible");
+
+            let indicador = document.createElement("div");
+            indicador.className = "indicador-fechas";
+            indicador.textContent = producto.lotes.length + " fechas";
+
+            info.appendChild(indicador);
+        }
+
+        let controles = document.createElement("div");
+        controles.className = "controles";
+
+        let menos = document.createElement("button");
+        menos.className = "control";
+        menos.textContent = "−";
+        menos.onclick = function(event){
+            event.stopPropagation();
+            restarUnidad(indice);
+        };
+
+        let numero = document.createElement("span");
+        numero.className = "numero";
+        numero.textContent = cantidadTotal;
+
+        let mas = document.createElement("button");
+        mas.className = "control";
+        mas.textContent = "+";
+        mas.onclick = function(event){
+            event.stopPropagation();
+            sumarUnidad(indice);
+        };
+
+        controles.appendChild(menos);
+        controles.appendChild(numero);
+        controles.appendChild(mas);
+
+        let cabecera = document.createElement("div");
+        cabecera.className = "producto-cabecera";
+        cabecera.appendChild(info);
+        cabecera.appendChild(controles);
+
+        fila.appendChild(cabecera);
+
+        if(producto.lotes.length > 1){
+
+            let detalle = document.createElement("div");
+            detalle.className = "detalle-fechas oculto";
+
+            producto.lotes
+                .slice()
+                .sort(ordenarLotesPorCaducidad)
+                .forEach(function(lote){
+
+                    let filaFecha = document.createElement("div");
+                    filaFecha.className = "fila-fecha";
+
+                    let fecha = document.createElement("span");
+                    fecha.textContent = lote.caducidad
+                        ? formatearFecha(lote.caducidad)
+                        : "Sin fecha";
+
+                    let cantidad = document.createElement("span");
+                    cantidad.textContent = lote.cantidad + " ud.";
+
+                    filaFecha.appendChild(fecha);
+                    filaFecha.appendChild(cantidad);
+
+                    detalle.appendChild(filaFecha);
+                });
+
+            fila.appendChild(detalle);
+
+            fila.onclick = function(){
+                detalle.classList.toggle("oculto");
+            };
+        }
+
+        lista.appendChild(fila);
+    });
+}
+
+function sumarUnidad(indice){
+
+    let producto = productos[indice];
+
+    if(!Array.isArray(producto.lotes)){
+        producto.lotes = [{
+            cantidad: typeof producto.cantidad === "number" ? producto.cantidad : 0,
+            caducidad:""
+        }];
+        delete producto.cantidad;
+    }
+
+    let loteObjetivo = producto.lotes
+        .slice()
+        .sort(ordenarLotesPorCaducidad)[0];
+
+    if(!loteObjetivo){
+        producto.lotes.push({
+            cantidad:1,
+            caducidad:""
+        });
+    } else {
+        loteObjetivo.cantidad += 1;
+    }
+
+    saveProd();
+
+    mostrarProductosLocalizacion();
+}
+
+
+function restarUnidad(indice){
+
+    let producto = productos[indice];
+
+    if(!Array.isArray(producto.lotes)){
+        producto.lotes = [{
+            cantidad: typeof producto.cantidad === "number" ? producto.cantidad : 0,
+            caducidad:""
+        }];
+        delete producto.cantidad;
+    }
+
+    let lotesConStock =
+        producto.lotes.filter(function(lote){
+            return lote.cantidad > 0;
+        });
+
+    if(!lotesConStock.length){
+        return;
+    }
+
+    if(lotesConStock.length === 1){
+
+        lotesConStock[0].cantidad -= 1;
+
+        if(lotesConStock[0].cantidad === 0){
+            producto.lotes = producto.lotes.filter(function(lote){
+                return lote !== lotesConStock[0];
+            });
+        }
+
+        if(producto.lotes.length === 0){
+            producto.lotes.push({
+                cantidad:0,
+                caducidad:""
+            });
+        }
+
+        saveProd();
+        mostrarProductosLocalizacion();
+        return;
+    }
+
+    lotesConStock.sort(ordenarLotesPorCaducidad);
+
+    let mensaje = "¿De qué fecha coges una unidad?\n\n";
+
+    lotesConStock.forEach(function(lote, posicion){
+
+        mensaje +=
+            (posicion + 1) +
+            ". " +
+            (lote.caducidad ? formatearFecha(lote.caducidad) : "Sin fecha") +
+            " — " +
+            lote.cantidad +
+            " ud.\n";
+    });
+
+    let eleccion = prompt(mensaje + "\nEscribe el número de la fecha:");
+
+    if(eleccion === null){
+        return;
+    }
+
+    let posicionElegida = parseInt(eleccion, 10) - 1;
+
+    if(
+        isNaN(posicionElegida) ||
+        posicionElegida < 0 ||
+        posicionElegida >= lotesConStock.length
+    ){
+        return;
+    }
+
+    let loteElegido = lotesConStock[posicionElegida];
+
+    loteElegido.cantidad -= 1;
+
+    if(loteElegido.cantidad === 0){
+        producto.lotes = producto.lotes.filter(function(lote){
+            return lote !== loteElegido;
+        });
+    }
+
+    if(producto.lotes.length === 0){
+        producto.lotes.push({
+            cantidad:0,
+            caducidad:""
+        });
+    }
+
+    saveProd();
+
+    mostrarProductosLocalizacion();
+}
+
+function ordenarLotesPorCaducidad(a,b){
+
+    if(a.caducidad && b.caducidad){
+        return a.caducidad.localeCompare(b.caducidad);
+    }
+
+    if(a.caducidad && !b.caducidad){
+        return -1;
+    }
+
+    if(!a.caducidad && b.caducidad){
+        return 1;
+    }
+
+    return 0;
+}
+
+
+function formatearFecha(fecha){
+
+    if(!fecha){
+        return "";
+    }
+
+    let partes = fecha.split("-");
+
+    return partes[2] + "/" + partes[1] + "/" + partes[0];
+}
+
+async function iniciarEscaner(){
+
+    const box = document.getElementById("scannerBox");
+    const estado = document.getElementById("estadoScan");
+
+    box.classList.remove("oculto");
+
+    if(escanerActivo){
+        return;
+    }
+
+    procesandoCodigo = false;
+    estado.textContent = "Abriendo cámara...";
+
+    try{
+
+        html5QrCode = new Html5Qrcode("reader");
+
+        const config = {
+            fps:10,
+            qrbox:{width:280,height:140},
+            aspectRatio:1.777778
+        };
+
+        await html5QrCode.start(
+            { facingMode:"environment" },
+            config,
+            codigoLeido,
+            function(){}
+        );
+
+        escanerActivo = true;
+        estado.textContent = "Apunta la cámara al código de barras.";
+
+    }catch(error){
+
+        estado.textContent =
+            "No se pudo abrir la cámara. La app necesita ejecutarse desde HTTPS y tener permiso de cámara.";
+
+        escanerActivo = false;
+    }
+}
+
+
+async function cerrarEscaner(){
+
+    if(html5QrCode && escanerActivo){
+
+        try{
+            await html5QrCode.stop();
+            await html5QrCode.clear();
+        }catch(error){}
+    }
+
+    html5QrCode = null;
+    escanerActivo = false;
+    procesandoCodigo = false;
+
+    const box = document.getElementById("scannerBox");
+
+    if(box){
+        box.classList.add("oculto");
+    }
+}
+
+
+async function codigoLeido(codigo){
+
+    if(procesandoCodigo){
+        return;
+    }
+
+    procesandoCodigo = true;
+
+    document.getElementById("codigoBarras").value = codigo;
+    document.getElementById("codigoDetectado").textContent =
+        "Código: " + codigo;
+
+    document.getElementById("estadoScan").textContent =
+        "Buscando producto...";
+
+    await cerrarEscaner();
+
+    let productoLocal = productos.find(function(producto){
+        return producto.codigoBarras === codigo;
+    });
+
+    if(productoLocal){
+
+        document.getElementById("nombreProd").value =
+            productoLocal.nombre;
+
+        document.getElementById("estadoScan").textContent =
+            "Producto reconocido en tu catálogo.";
+
+        procesandoCodigo = false;
+        return;
+    }
+
+    try{
+
+        const respuesta = await fetch(
+            "https://world.openfoodfacts.org/api/v2/product/" +
+            encodeURIComponent(codigo) +
+            ".json"
+        );
+
+        if(!respuesta.ok){
+            throw new Error("Error de consulta");
+        }
+
+        const datos = await respuesta.json();
+
+        if(datos.status === 1 && datos.product){
+
+            const nombre =
+                datos.product.product_name_es ||
+                datos.product.product_name ||
+                datos.product.generic_name_es ||
+                datos.product.generic_name ||
+                "";
+
+            if(nombre){
+
+                document.getElementById("nombreProd").value = nombre;
+
+                document.getElementById("estadoScan").textContent =
+                    "Producto encontrado.";
+
+            }else{
+
+                document.getElementById("estadoScan").textContent =
+                    "Código reconocido, pero sin nombre. Escríbelo manualmente.";
+            }
+
+        }else{
+
+            document.getElementById("estadoScan").textContent =
+                "Producto no encontrado. Escríbelo una vez y quedará guardado.";
+        }
+
+    }catch(error){
+
+        document.getElementById("estadoScan").textContent =
+            "No se pudo consultar la base de datos. Puedes escribir el producto manualmente.";
+    }
+
+    procesandoCodigo = false;
+}
+
+
+document
+    .getElementById("nombreLoc")
+    .addEventListener("keydown", function(event){
+
+        if(event.key === "Enter"){
+            anadirLoc();
+        }
+    });
+
+
+mostrarLoc();
+
+</script>
+</body>
+</html>

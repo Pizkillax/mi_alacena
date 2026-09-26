@@ -216,8 +216,29 @@
         .secundario{
             background:#6d6d6d;
         }
+
+        .foto-fecha-box{
+            margin-top:10px;
+            padding:12px;
+            background:white;
+            border-radius:12px;
+            box-shadow:0 2px 6px #0001;
+        }
+
+        .estado-fecha{
+            margin-top:8px;
+            color:#666;
+            font-size:14px;
+        }
+
+        .fecha-detectada{
+            margin-top:8px;
+            font-weight:bold;
+            color:#477a57;
+        }
     </style>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 
 <body>
@@ -284,6 +305,24 @@
         <div class="campo">
             <label>Fecha de caducidad</label>
             <input id="caducidad" type="date">
+
+            <button class="grande" type="button" onclick="abrirCamaraFecha()">
+                Leer fecha con la cámara
+            </button>
+
+            <input
+                id="fotoFecha"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                class="oculto"
+                onchange="procesarFotoFecha(event)"
+            >
+
+            <div id="fotoFechaBox" class="foto-fecha-box oculto">
+                <div id="estadoFecha" class="estado-fecha"></div>
+                <div id="fechaDetectada" class="fecha-detectada"></div>
+            </div>
         </div>
 
         <div class="campo">
@@ -532,6 +571,11 @@ function abrirProducto(){
     document.getElementById("codigoDetectado").textContent = "";
     document.getElementById("estadoScan").textContent =
         "Apunta la cámara al código de barras.";
+
+    document.getElementById("fotoFechaBox").classList.add("oculto");
+    document.getElementById("estadoFecha").textContent = "";
+    document.getElementById("fechaDetectada").textContent = "";
+    document.getElementById("fotoFecha").value = "";
 }
 
 
@@ -614,6 +658,10 @@ function guardarProd(){
     document.getElementById("cantidad").value = 1;
     document.getElementById("caducidad").value = "";
     document.getElementById("codigoBarras").value = "";
+    document.getElementById("fotoFecha").value = "";
+    document.getElementById("fotoFechaBox").classList.add("oculto");
+    document.getElementById("estadoFecha").textContent = "";
+    document.getElementById("fechaDetectada").textContent = "";
 
     cerrarEscaner();
     inicio();
@@ -1111,6 +1159,206 @@ async function codigoLeido(codigo){
     }
 
     procesandoCodigo = false;
+}
+
+
+
+function abrirCamaraFecha(){
+
+    document.getElementById("fotoFecha").click();
+}
+
+
+async function procesarFotoFecha(event){
+
+    const archivo = event.target.files && event.target.files[0];
+
+    if(!archivo){
+        return;
+    }
+
+    const box = document.getElementById("fotoFechaBox");
+    const estado = document.getElementById("estadoFecha");
+    const detectada = document.getElementById("fechaDetectada");
+
+    box.classList.remove("oculto");
+    estado.textContent = "Leyendo la fecha...";
+    detectada.textContent = "";
+
+    try{
+
+        const resultado = await Tesseract.recognize(
+            archivo,
+            "spa",
+            {
+                logger: function(m){
+
+                    if(m.status === "recognizing text" && typeof m.progress === "number"){
+                        estado.textContent =
+                            "Leyendo la fecha... " +
+                            Math.round(m.progress * 100) +
+                            "%";
+                    }
+                }
+            }
+        );
+
+        const texto = resultado.data.text || "";
+
+        const fechas = extraerFechas(texto);
+
+        if(fechas.length === 0){
+
+            estado.textContent =
+                "No he podido detectar una fecha con seguridad. Puedes escribirla manualmente.";
+
+            return;
+        }
+
+        let fechaElegida = fechas[0];
+
+        if(fechas.length > 1){
+
+            let mensaje =
+                "He encontrado varias fechas:\\n\\n";
+
+            fechas.forEach(function(fecha, indice){
+                mensaje +=
+                    (indice + 1) +
+                    ". " +
+                    fecha.mostrar +
+                    "\\n";
+            });
+
+            let respuesta = prompt(
+                mensaje +
+                "\\nEscribe el número de la fecha correcta:"
+            );
+
+            if(respuesta === null){
+                estado.textContent =
+                    "No se ha seleccionado ninguna fecha.";
+                return;
+            }
+
+            let posicion = parseInt(respuesta, 10) - 1;
+
+            if(
+                isNaN(posicion) ||
+                posicion < 0 ||
+                posicion >= fechas.length
+            ){
+                estado.textContent =
+                    "Selección no válida. Puedes escribir la fecha manualmente.";
+                return;
+            }
+
+            fechaElegida = fechas[posicion];
+        }
+
+        const confirmar = confirm(
+            "He leído " +
+            fechaElegida.mostrar +
+            ".\\n\\n¿Es correcto?"
+        );
+
+        if(confirmar){
+
+            document.getElementById("caducidad").value =
+                fechaElegida.iso;
+
+            detectada.textContent =
+                "Fecha confirmada: " +
+                fechaElegida.mostrar;
+
+            estado.textContent =
+                "Fecha añadida.";
+        }else{
+
+            estado.textContent =
+                "No se ha guardado la fecha. Puedes repetir la foto o escribirla manualmente.";
+        }
+
+    }catch(error){
+
+        estado.textContent =
+            "No se pudo leer la foto. Puedes repetirla o escribir la fecha manualmente.";
+    }
+}
+
+
+function extraerFechas(texto){
+
+    let encontradas = [];
+    let claves = {};
+
+    let patrones = [
+        /(?:^|\\D)(\\d{1,2})[\\.\\/\\-](\\d{1,2})[\\.\\/\\-](\\d{4})(?:\\D|$)/g,
+        /(?:^|\\D)(\\d{1,2})[\\.\\/\\-](\\d{1,2})[\\.\\/\\-](\\d{2})(?:\\D|$)/g
+    ];
+
+    patrones.forEach(function(patron){
+
+        let coincidencia;
+
+        while((coincidencia = patron.exec(texto)) !== null){
+
+            let dia = parseInt(coincidencia[1], 10);
+            let mes = parseInt(coincidencia[2], 10);
+            let anio = parseInt(coincidencia[3], 10);
+
+            if(anio < 100){
+                anio += 2000;
+            }
+
+            if(
+                dia < 1 || dia > 31 ||
+                mes < 1 || mes > 12 ||
+                anio < 2020 || anio > 2100
+            ){
+                continue;
+            }
+
+            let iso =
+                String(anio).padStart(4,"0") +
+                "-" +
+                String(mes).padStart(2,"0") +
+                "-" +
+                String(dia).padStart(2,"0");
+
+            let fechaPrueba = new Date(
+                anio,
+                mes - 1,
+                dia
+            );
+
+            if(
+                fechaPrueba.getFullYear() !== anio ||
+                fechaPrueba.getMonth() !== mes - 1 ||
+                fechaPrueba.getDate() !== dia
+            ){
+                continue;
+            }
+
+            if(claves[iso]){
+                continue;
+            }
+
+            claves[iso] = true;
+
+            encontradas.push({
+                iso:iso,
+                mostrar:
+                    String(dia).padStart(2,"0") +
+                    "/" +
+                    String(mes).padStart(2,"0") +
+                    "/" +
+                    String(anio)
+            });
+        }
+    });
+
+    return encontradas;
 }
 
 

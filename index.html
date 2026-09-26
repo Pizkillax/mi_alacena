@@ -323,6 +323,7 @@
             <div id="fotoFechaBox" class="foto-fecha-box oculto">
                 <div id="estadoFecha" class="estado-fecha"></div>
                 <div id="fechaDetectada" class="fecha-detectada"></div>
+                <div id="textoOCR" class="estado-fecha"></div>
             </div>
         </div>
 
@@ -577,6 +578,7 @@ function abrirProducto(){
     document.getElementById("caducidadMes").value = "";
     document.getElementById("estadoFecha").textContent = "";
     document.getElementById("fechaDetectada").textContent = "";
+    document.getElementById("textoOCR").textContent = "";
     document.getElementById("fotoFecha").value = "";
 }
 
@@ -667,6 +669,7 @@ function guardarProd(){
     document.getElementById("fotoFechaBox").classList.add("oculto");
     document.getElementById("estadoFecha").textContent = "";
     document.getElementById("fechaDetectada").textContent = "";
+    document.getElementById("textoOCR").textContent = "";
 
     cerrarEscaner();
     inicio();
@@ -1212,6 +1215,9 @@ async function procesarFotoFecha(event){
         await worker.terminate();
 
         const texto = resultado.data.text || "";
+
+        document.getElementById("textoOCR").textContent =
+            "Texto leído por OCR: " + (texto.trim() || "[vacío]");
 
         const fechas = extraerFechas(texto);
 

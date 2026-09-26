@@ -305,6 +305,7 @@
         <div class="campo">
             <label>Fecha de caducidad</label>
             <input id="caducidad" type="date">
+            <input id="caducidadMes" type="hidden">
 
             <button class="grande" type="button" onclick="abrirCamaraFecha()">
                 Leer fecha con la cámara
@@ -573,6 +574,7 @@ function abrirProducto(){
         "Apunta la cámara al código de barras.";
 
     document.getElementById("fotoFechaBox").classList.add("oculto");
+    document.getElementById("caducidadMes").value = "";
     document.getElementById("estadoFecha").textContent = "";
     document.getElementById("fechaDetectada").textContent = "";
     document.getElementById("fotoFecha").value = "";
@@ -588,7 +590,9 @@ function guardarProd(){
         parseInt(document.getElementById("cantidad").value, 10);
 
     let caducidad =
-        document.getElementById("caducidad").value || "";
+        document.getElementById("caducidad").value ||
+        document.getElementById("caducidadMes").value ||
+        "";
 
     let localizacion =
         document.getElementById("selectorLoc").value;
@@ -657,6 +661,7 @@ function guardarProd(){
     document.getElementById("nombreProd").value = "";
     document.getElementById("cantidad").value = 1;
     document.getElementById("caducidad").value = "";
+    document.getElementById("caducidadMes").value = "";
     document.getElementById("codigoBarras").value = "";
     document.getElementById("fotoFecha").value = "";
     document.getElementById("fotoFechaBox").classList.add("oculto");
@@ -1008,6 +1013,10 @@ function formatearFecha(fecha){
 
     let partes = fecha.split("-");
 
+    if(partes.length === 2){
+        return partes[1] + "/" + partes[0];
+    }
+
     return partes[2] + "/" + partes[1] + "/" + partes[0];
 }
 
@@ -1263,8 +1272,13 @@ async function procesarFotoFecha(event){
 
         if(confirmar){
 
-            document.getElementById("caducidad").value =
-                fechaElegida.iso;
+            if(fechaElegida.precision === "mes"){
+                document.getElementById("caducidad").value = "";
+                document.getElementById("caducidadMes").value = fechaElegida.iso;
+            }else{
+                document.getElementById("caducidad").value = fechaElegida.iso;
+                document.getElementById("caducidadMes").value = "";
+            }
 
             detectada.textContent =
                 "Fecha confirmada: " +
@@ -1376,12 +1390,12 @@ function extraerFechas(texto){
     let encontradas = [];
     let claves = {};
 
-    let patrones = [
-        /(?:^|\\D)(\\d{1,2})[\\.\\/\\-](\\d{1,2})[\\.\\/\\-](\\d{4})(?:\\D|$)/g,
-        /(?:^|\\D)(\\d{1,2})[\\.\\/\\-](\\d{1,2})[\\.\\/\\-](\\d{2})(?:\\D|$)/g
+    let patronesCompletos = [
+        /(?:^|\D)(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{4})(?:\D|$)/g,
+        /(?:^|\D)(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{2})(?:\D|$)/g
     ];
 
-    patrones.forEach(function(patron){
+    patronesCompletos.forEach(function(patron){
 
         let coincidencia;
 
@@ -1403,18 +1417,7 @@ function extraerFechas(texto){
                 continue;
             }
 
-            let iso =
-                String(anio).padStart(4,"0") +
-                "-" +
-                String(mes).padStart(2,"0") +
-                "-" +
-                String(dia).padStart(2,"0");
-
-            let fechaPrueba = new Date(
-                anio,
-                mes - 1,
-                dia
-            );
+            let fechaPrueba = new Date(anio, mes - 1, dia);
 
             if(
                 fechaPrueba.getFullYear() !== anio ||
@@ -1424,6 +1427,13 @@ function extraerFechas(texto){
                 continue;
             }
 
+            let iso =
+                String(anio).padStart(4,"0") +
+                "-" +
+                String(mes).padStart(2,"0") +
+                "-" +
+                String(dia).padStart(2,"0");
+
             if(claves[iso]){
                 continue;
             }
@@ -1432,6 +1442,7 @@ function extraerFechas(texto){
 
             encontradas.push({
                 iso:iso,
+                precision:"dia",
                 mostrar:
                     String(dia).padStart(2,"0") +
                     "/" +
@@ -1442,9 +1453,46 @@ function extraerFechas(texto){
         }
     });
 
+    let patronMes =
+        /(?:^|\D)(\d{1,2})[\.\/\-](\d{4})(?:\D|$)/g;
+
+    let coincidenciaMes;
+
+    while((coincidenciaMes = patronMes.exec(texto)) !== null){
+
+        let mes = parseInt(coincidenciaMes[1], 10);
+        let anio = parseInt(coincidenciaMes[2], 10);
+
+        if(
+            mes < 1 || mes > 12 ||
+            anio < 2020 || anio > 2100
+        ){
+            continue;
+        }
+
+        let iso =
+            String(anio).padStart(4,"0") +
+            "-" +
+            String(mes).padStart(2,"0");
+
+        if(claves[iso]){
+            continue;
+        }
+
+        claves[iso] = true;
+
+        encontradas.push({
+            iso:iso,
+            precision:"mes",
+            mostrar:
+                String(mes).padStart(2,"0") +
+                "/" +
+                String(anio)
+        });
+    }
+
     return encontradas;
 }
-
 
 document
     .getElementById("nombreLoc")
